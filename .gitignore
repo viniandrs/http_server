@@ -1,0 +1,9 @@
+/webspace*
+*.htpasswd*
+*lex.yy.c
+*parser.tab.c
+*parser.tab.h
+*register.log
+*server
+*valgrind*
+*.vscode
