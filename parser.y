@@ -44,7 +44,7 @@ input               : input http_request
 
 http_request        : HTTP_METHOD FILEPATH HTTP_VERSION EOL field_list {
                         // printing request details on the screen
-                        printf("\nProcessing request:\n%s\n", request);
+                        printf("\nProcessing request:\n%s", request);
 
                         // formating path strings
                         char *resource = format_resource_path($2);

@@ -66,7 +66,8 @@ Date: %s\n\
 Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
 Transfer-Encoding: chunked\n\
 Content-Type: text/html\n\
-WWW-Authenticate: Basic realm=%s", time, realm);
+WWW-Authenticate: Basic realm=%s\n\
+Enter password for realm %s", time, realm, realm);
     char *header = malloc(header_len + 1);
     sprintf(header,
 "HTTP/1.1 401 Authorization Required\n\
@@ -74,7 +75,8 @@ Date: %s\n\
 Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
 Transfer-Encoding: chunked\n\
 Content-Type: text/html\n\
-WWW-Authenticate: Basic realm=%s", time, realm);
+WWW-Authenticate: Basic realm=%s\n\
+Enter password for realm %s", time, realm, realm);
     return header;
 }
 

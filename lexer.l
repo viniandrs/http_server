@@ -10,7 +10,7 @@ extern FILE *yyin;
 
 %START  ValueList
 
-http_methods (GET|HEAD|TRACE|OPTIONS|DELETE|PUT|UPDATE)
+http_methods (GET|HEAD|TRACE|OPTIONS|DELETE|PUT)
 %%
 
 ^{http_methods}                                                 ; { yylval.str = strdup(yytext); return HTTP_METHOD; }

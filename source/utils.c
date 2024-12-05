@@ -111,20 +111,41 @@ int fetchr(char* webspace_path, char *resource, struct stat *st, ValueNode *cred
         struct dirent *entry;
         int file_found = 0;
 
+        // checking if there's a .htaccess file in the directory
+        sprintf(htaccess_path, "%s%s", partial_path, "/.htaccess");
+        if (access(htaccess_path, F_OK) != -1) {
+            // checking credentials
+            printf("Checking credentials for %s\n", htaccess_path);
+            printf("Credentials provided: ");
+            dump_values(credentials);
+            if (!check_credentials(htaccess_path, credentials)) {
+                printf("Access denied for %s\n", htaccess_path);
+                status = 401;  // Forbidden
+            }
+        }
+
+        char *dir_path = strdup(partial_path);
         while ((entry = readdir(dir)) != NULL) {
             if ((strcmp(entry->d_name, "index.html") == 0) 
             ||  (strcmp(entry->d_name, "welcome.html") == 0)) {
+                
                 strcat(partial_path, "/");
                 strcat(partial_path, entry->d_name);
                 file_found = 1;
-                break;
+                status = fetch(partial_path, st);
+                printf("Found %s with status %d\n", partial_path, status);
+                
+                if(status == 200) break;
+
+                // if the first file found is not accessible, keep looking for the another one
+                strcpy(partial_path, dir_path);
             }
         }
+        // return the st pointer to directory
+        stat(dir_path, st);
+        free(dir_path);
         closedir(dir);
-
         if (!file_found) status = 404; // Not found
-        else if (!(st->st_mode & S_IRUSR)) status = 403; // Forbidden
-        else if (open(partial_path, O_RDONLY) == -1) status = 500;  // Internal server error
     }
     free(resource_copy);
     return status;
@@ -139,6 +160,7 @@ int fetch(const char *path, struct stat *st) {
         if (errno == ENOENT) {
             return 404; // Not found
         } else {
+            printf("Stat error: %s\n", strerror(errno));
             return 500;  // Internal server error
         }
     }
@@ -153,6 +175,7 @@ int fetch(const char *path, struct stat *st) {
         // open it in read-only mode
         fd = open(path, O_RDONLY);
         if ((fd = open(path, O_RDONLY)) == -1) {
+            printf("Open error: %s\n", strerror(errno));
             return 500;  // Internal server error
         }
         close(fd);
@@ -170,6 +193,7 @@ int fetch(const char *path, struct stat *st) {
         // Open the directory
         DIR *dir = opendir(path);
         if (!dir) {
+            printf("Open dir error: %s\n", strerror(errno));
             return 500;  // Internal server error
         }
         closedir(dir);
@@ -177,6 +201,7 @@ int fetch(const char *path, struct stat *st) {
     }    
 
     // If neither a file nor a directory, raises error
+    printf("Resource is not a file or directory\n");
     return 500;  // Internal server error
 }
 

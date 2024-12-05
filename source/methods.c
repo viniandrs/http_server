@@ -15,6 +15,7 @@
 #include "../include/methods.h"
 #include "../include/lists.h"
 #include "../include/auth.h"
+#include "../include/utils.h"
 
 char *error_handler(int code) {
     char *body;
@@ -170,32 +171,41 @@ char* get(char* path, struct stat *st) {
         size_t new_path_len;
         int file_found = 0;
 
+        char *dir_path = strdup(path);
         while ((entry = readdir(dir)) != NULL) {
-            if (strcmp(entry->d_name, "index.html") == 0) {
-                new_path_len = snprintf(NULL, 0, "%s/index.html", path);
-                path = (char *)realloc(path, new_path_len + 1);
-                sprintf(path, "%s/index.html", path);
-                file_found = 1;
-                break;
+            if (strcmp(entry->d_name, "index.html") != 0 && 
+                strcmp(entry->d_name, "welcome.html") != 0) {
+                continue;
             }
-            else if (strcmp(entry->d_name, "welcome.html") == 0) {
-                new_path_len = snprintf(NULL, 0, "%s/welcome.html", path);
-                path = (char *)realloc(path, new_path_len + 1);
-                sprintf(path, "%s/welcome.html", path);
-                file_found = 1;
-                break;
+            path = (char *)realloc(path, strlen(path) + sizeof("/welcome.html") + 1); // worst case scenario
+            strcat(path, "/");
+            strcat(path, entry->d_name);
+
+            if(strcmp(entry->d_name, "index.html") == 0) {
+                // found index.html
+                if(fetch(path, st) == 200) break;
+
+                //index.html is not accessible, return welcome.html
+                sprintf(path, "%s/welcome.html", dir_path);
+                break;                        
             }
+
+            // found welcome.html
+            if(fetch(path, st) == 200) break;
+
+            //welcome.html is not accessible, return index.html
+            sprintf(path, "%s/index.html", dir_path);
+            break;             
         }
+        free(dir_path);
         closedir(dir);
-        if (!file_found) {
-            printf("404 Not Found: No index.html or welcome.html found in the directory\n");
-            exit(1);
-        }
 
         if (stat(path, st) != 0) {
             printf("Error while accessing the file: %s\n", strerror(errno));
             exit(errno);
         }
+
+        printf("File was directory so GET will return %s\n", path);
     }
     
     printf("File size of %s: %jd\n", path, st->st_size);
