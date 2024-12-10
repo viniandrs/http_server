@@ -8,6 +8,30 @@
 #include <libgen.h>
 
 #include "../include/auth.h"
+#include "../include/utils.h"
+
+extern char *webspace_path;
+
+char *get_field_from_htaccess(char *htaccess_path, char *field) {
+    FILE *htaccess_file = fopen(htaccess_path, "r");
+    if (!htaccess_file) {
+        fprintf(stderr, "Error while opening .htaccess file: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    char line[1024];
+    while (fgets(line, sizeof(line), htaccess_file)) {
+        if (strncmp(line, field, strlen(field)) == 0) {
+            // Found the field
+            char *value = strchr(line, ' ');
+            value[strlen(value) - 1] = '\0';
+            fclose(htaccess_file);
+            return strdup(value+1); // removing the space
+        }
+    }
+    fclose(htaccess_file);
+    return NULL;
+}
 
 // Function to decode a Base64-encoded string
 char *base64_decode(const char *input) {
@@ -47,7 +71,7 @@ char *base64_decode(const char *input) {
     return decoded;
 }
 
-char *auth_header(char *webspace_path, char *resource, ValueNode* credentials) {
+char *header_401_unauthorized(char *resource, ValueNode* credentials) {
     // get the current date
     struct timeval tv;
     struct tm *tm_info;
@@ -58,7 +82,7 @@ char *auth_header(char *webspace_path, char *resource, ValueNode* credentials) {
     strftime(time, sizeof(time), "%a, %d %b %Y %H:%M:%S BRT", tm_info); // Format the time according to the HTTP date format
 
     // get the authentication realm
-    char *realm = get_realm(webspace_path, resource, credentials);
+    char *realm = get_realm(resource, credentials);
 
     size_t header_len = snprintf(NULL, 0,
 "HTTP/1.1 401 Authorization Required\n\
@@ -80,7 +104,8 @@ Enter password for realm %s", time, realm, realm);
     return header;
 }
 
-int check_credentials(char *htaccess_path, ValueNode* credentials) {
+int check_credentials(char *htaccess_path_original, ValueNode* credentials) {
+    char *htaccess_path = strdup(htaccess_path_original);
     if (credentials == NULL) { // no credentials provided
         return 0;
     }
@@ -188,17 +213,14 @@ ValueNode* get_credentials(FieldNode *field_list) {
     return credentials;
 }
 
-char *get_realm(char *webspace_path, char *resource, ValueNode* credentials) {
-    size_t abs_path_len = snprintf(NULL, 0, "%s%s", webspace_path, resource);
-    char abs_path[abs_path_len + 1];
-    sprintf(abs_path, "%s%s", webspace_path, resource);
-                        
+char *get_realm(char *resource, ValueNode* credentials) {   
+    size_t max_len = strlen(webspace_path) + strlen(resource) + 1;                     
     // Tokenize the resource path by '/'
     char *token;
     char *resource_copy = strdup(resource);  // Duplicate the string as strtok modifies it
-    char partial_path[strlen(abs_path) + 1];
-    char htaccess_path[strlen(abs_path) + 11];
-    char real_path[strlen(abs_path) + 1];
+    char partial_path[max_len];
+    char htaccess_path[strlen(webspace_path) + strlen(resource) + 11];
+    char real_path[max_len];
     strcpy(partial_path, webspace_path);
 
     // Fetching recursively each directory in the path until the final file
@@ -217,27 +239,127 @@ char *get_realm(char *webspace_path, char *resource, ValueNode* credentials) {
                 continue;
             }
 
-            // Reading the .htaccess file
-            FILE *htaccess_file = fopen(htaccess_path, "r");
-            if (htaccess_file == NULL) {
-                perror("Error while opening .htaccess file");
+            char *realm  = get_field_from_htaccess(htaccess_path, "AuthName");
+
+            if (!realm) {
+                fprintf(stderr, "AuthName directive not found in .htaccess file.\n");
+                free(resource_copy);
                 return NULL;
             }
-
-            char line[1024];
-            while (fgets(line, sizeof(line), htaccess_file)) {
-                if (strncmp(line, "AuthName", 8) == 0) {
-                    // Found the AuthName directive
-                    char *realm = strchr(line, ' ');
-                    realm[strlen(realm) - 1] = '\0';
-
-                    fclose(htaccess_file);
-                    return strdup(realm+1); // removing the space
-                }
-            }
-            fclose(htaccess_file);
+            free(resource_copy);
+            return realm;
         }
         // Move to the next token (directory or file)
         token = strtok(NULL, "/");
     }
+    free(resource_copy);
+    return NULL;
+}
+
+int update_passwords(char *htaccess_path, char **values) {
+    char *username = values[0];
+    char *password = values[1];
+    char *new_password = values[2];
+    char *conf_new_password = values[3];
+
+    if (strcmp(new_password, conf_new_password) != 0) {
+        fprintf(stderr, "Passwords do not match.\n");
+        return 0;
+    }
+
+    // checking credentials for current password:
+    ValueNode *credentials = malloc(sizeof(ValueNode));
+    credentials->value = malloc(strlen(username) + strlen(password) + 2);
+    snprintf(credentials->value, strlen(username) + strlen(password) + 2, "%s:%s", username, password);
+    credentials->next = NULL;
+
+    if (!check_credentials(htaccess_path, credentials)) {
+        fprintf(stderr, "Incorrect password.\n");
+        return 0;
+    }
+    free(credentials->value);
+    free(credentials);
+
+    // get .htpasswd file from .htaccess file
+    char *AuthUserFile = get_field_from_htaccess(htaccess_path, "AuthUserFile");
+    if (AuthUserFile == NULL) {
+        fprintf(stderr, "AuthUserFile directive not found in .htaccess file.\n");
+        return 0;
+    }
+
+    char htpasswd_path[1024]="";
+    char htpasswd_abs_path[1024];
+    strcat(htpasswd_path, dirname(htaccess_path));
+    strcat(htpasswd_path, "/");
+    strcat(htpasswd_path, AuthUserFile);
+    realpath(htpasswd_path, htpasswd_abs_path);
+
+    // Check if the user file exists
+    if (access(htpasswd_abs_path, F_OK) != 0) {
+        printf("User file not found at %s\n", htpasswd_abs_path);
+        return 0;
+    }
+
+     // Saving credentials into memory
+    FILE *user_file_ptr = fopen(htpasswd_abs_path, "r");
+    if (user_file_ptr == NULL) {
+        perror("Error while opening user file");
+        return 0;
+    }
+
+    char **lines = NULL;
+    size_t line_count = 0;
+    char line[1024];
+
+    while (fgets(line, sizeof(line), user_file_ptr)) {
+        lines = realloc(lines, sizeof(char *) * (line_count + 1));
+        lines[line_count] = strdup(line);
+        line_count++;
+    }
+
+    fclose(user_file_ptr);
+
+    // Update the password for the specified user
+    int user_found = 0;
+    for (size_t i = 0; i < line_count; i++) {
+        char *temp = strdup(lines[i]);
+        char *username_line = strtok(temp, ":");
+        if (strcmp(username_line, username) == 0) {
+            free(lines[i]);
+            size_t new_line_size = strlen(username) + strlen(new_password) + 3;
+            lines[i] = malloc(new_line_size);
+            snprintf(lines[i], new_line_size, "%s:%s\n", username, new_password);
+            user_found = 1;
+        }
+        free(temp);
+    }
+    // Add the user to the file
+    if (!user_found) {
+        size_t new_line_size = strlen(username) + strlen(new_password) + 3;
+        lines = realloc(lines, sizeof(char *) * (line_count + 1));
+        lines[line_count] = malloc(new_line_size);
+        snprintf(lines[line_count], new_line_size, "%s:%s\n", username, new_password);
+        line_count++;
+    }
+
+    // Write the updated lines back to the file
+    FILE *new_user_file_ptr = fopen(htpasswd_abs_path, "w");
+    if (new_user_file_ptr == NULL) {
+        perror("Error while opening user file for writing");
+        for (size_t i = 0; i < line_count; i++) {
+            free(lines[i]);
+        }
+        free(lines);
+        return 0;
+    }
+
+    for (size_t i = 0; i < line_count; i++) {
+        fputs(lines[i], new_user_file_ptr);
+        free(lines[i]);
+    }
+
+    free(lines);
+    fclose(new_user_file_ptr);
+
+    return 1;
 }

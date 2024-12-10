@@ -16,6 +16,9 @@
 #include "../include/lists.h"
 #include "../include/auth.h"
 #include "../include/utils.h"
+#include "../include/headers.h"
+
+extern char *webspace_path;
 
 char *error_handler(int code) {
     char *body;
@@ -71,10 +74,9 @@ char *error_handler(int code) {
     return body;
 }
 
-char *head(struct stat *st, int code) {
+char *head(struct stat *st, int code, const char *content_type) {
     // getting the code status
-    char *status = (code == 200) ? "OK" : (code == 403) ? "Forbidden" : (code == 404) ? "Not Found" 
-                 : (code == 501) ? "Not implemented" : (code == 401) ? "Authorization Required" : "Internal Server Error";
+    char *status = (code == 403) ? "Forbidden" : (code == 404) ? "Not Found" : (code == 501) ? "Not implemented" : "Internal Server Error";
 
     // getting the current date
     struct timeval tv;
@@ -88,57 +90,12 @@ char *head(struct stat *st, int code) {
     // getting the connection type
     char *connection = (code == 200) ? "keep-alive" : "close";
 
-    // content type
-    char *content_type = "text/html; charset=UTF-8";
-
     // fields now depend on the status code
     char *header;
     if (code == 200) {
-        // last modified date
-        char last_modified_time[30];
-        struct tm *mod_time_info = localtime(&(st->st_mtime));
-        strftime(last_modified_time, sizeof(last_modified_time), "%a, %d %b %Y %H:%M:%S BRT", mod_time_info);
-
-        // writing the header
-        size_t header_len = snprintf(NULL, 0,
-"HTTP/1.1 %d %s\n\
-Date: %s\n\
-Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
-Connection: %s\n\
-Last-Modified: %s\n\
-Content-Length: %jd\n\
-Content-Type: %s\n\
-", code, status, time, connection, last_modified_time, st->st_size, content_type);
-        header = (char *)calloc(header_len + 1, sizeof(char));
-        sprintf(header,
-"HTTP/1.1 %d %s\n\
-Date: %s\n\
-Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
-Connection: %s\n\
-Last-Modified: %s\n\
-Content-Length: %jd\n\
-Content-Type: %s\n\
-", code, status, time, connection, last_modified_time, st->st_size, content_type);
-    } 
-    else if (code == 401) {
-        // writing the header
-        size_t header_len = snprintf(NULL, 0,
-"HTTP/1.1 %d %s\n\
-Date: %s\n\
-Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
-WWW-Authenticate:  Basic realm=\"Espaço Protegido 1\"\n\
-Transfer-Encoding: chunked\n\
-Content-Type: text/html\n\
-", code, status, time);
-        header = (char *)calloc(header_len + 1, sizeof(char));
-        sprintf(header,
-"HTTP/1.1 %d %s\n\
-Date: %s\n\
-Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
-WWW-Authenticate:  Basic realm=\"Espaço Protegido 1\"\n\
-Transfer-Encoding: chunked\n\
-Content-Type: text/html\n\
-", code, status, time);
+        header = header_200_ok(time, st, content_type);
+    } else if (code == 201 ) {
+        header = header_201_created(time, st, content_type);
     } else {
         // writing the header
         size_t header_len = snprintf(NULL, 0,
@@ -272,27 +229,4 @@ Content-Length: %jd\n\
 Content-Type: %s\n\
     ", code, status, time, connection, last_modified_time, st->st_size, content_type);
     return header;
-}
-
-int trace(const char *web_path, const char *resource, const char *message) {
-    // Combining path and resource to get the complete path
-    char path[1024];  
-    sprintf(path, "%s/%s", web_path, resource);
-
-    struct stat *st;         // structure to store file information
-    if (stat(path, st) != 0) {
-        if (errno == ENOENT) {
-            printf("Not found %s\n", path);
-            return 404; // Not found
-        } else {
-            perror("Error while accessing the file");
-            return 500;  // Internal server error
-        }
-    }
-
-    char *header = head(st, 200);
-    char *response = (char *)malloc(2048);
-    sprintf(response, "%s\n%s", header, message);
-    write(STDOUT_FILENO, response, strlen(response));  // Writing the response in STDOUT
-    return 200;
 }

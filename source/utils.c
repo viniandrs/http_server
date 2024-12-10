@@ -13,8 +13,9 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <stddef.h>
+#include <libgen.h>
 
-extern char *log_file;
+extern char *log_file, *webspace_path;
 
 char *format_webspace_path(char *webspace_path) {
     // Temporary buffer for the resolved absolute path
@@ -41,15 +42,88 @@ char *format_webspace_path(char *webspace_path) {
     return formatted_path;
 }
 
-char *format_resource_path(char *resource) {
+char *format_resource_path(char *resource_unformatted) {
+    char *resource = strdup(resource_unformatted);
+
     // if resource is ends with '/', remove it
     if (resource[strlen(resource) - 1] == '/') {
         resource[strlen(resource) - 1] = '\0';
     }
+
     return resource;
 }
 
-int fetchr(char* webspace_path, char *resource, struct stat *st, ValueNode *credentials) {
+char *format_and_resolve_resource_path(char *resource_unformatted) {
+    char *resource = strdup(resource_unformatted);
+
+    // if resource is ends with '/', remove it
+    if (resource[strlen(resource) - 1] == '/') {
+        resource[strlen(resource) - 1] = '\0';
+    }
+
+    // concatenate with webspace path and resolve the absolute path
+    size_t abs_path_len = snprintf(NULL, 0, "%s%s", webspace_path, resource);
+    char *abs_path = calloc(abs_path_len + 1, sizeof(char));
+    sprintf(abs_path, "%s%s", webspace_path, resource);
+
+    return abs_path;
+}
+
+char *get_absolute_path(char *relative_path) {
+    // Temporary buffer for the resolved absolute path
+    char resolved_path[1024];
+
+    // Get the absolute path of the resource
+    if (realpath(relative_path, resolved_path) == NULL) {
+        // Handle the case where realpath fails
+        printf("Error while resolving the absolute path: %s\n", strerror(errno));
+        return NULL; 
+    }
+
+    // Dynamically allocate memory for the resulting path
+    char *absolute_path = strdup(resolved_path);
+
+    return absolute_path;    
+}
+
+const char *get_content_type(const char *filepath) {
+    // File extension map
+    struct {
+        const char *extension;
+        const char *content_type;
+    } mime_map[] = {
+        { "gif", "image/gif" },
+        { "png", "image/png" },
+        { "jpg", "image/jpeg" },
+        { "jpeg", "image/jpeg" },
+        { "tif", "image/tiff" },
+        { "tiff", "image/tiff" },
+        { "pdf", "application/pdf" },
+        { "zip", "application/zip" },
+        { "html", "text/html" },
+        { "txt", "text/plain" },
+        { "odt", "application/vnd.oasis.opendocument.text" },
+        { NULL, NULL }  // Sentinel value
+    };
+
+    // Extract the file extension
+    const char *dot = strrchr(filepath, '.');
+    if (!dot || dot == filepath) {
+        return "application/octet-stream"; // Default to binary if no extension
+    }
+    const char *extension = dot + 1;
+
+    // Match the extension to a known content type
+    for (int i = 0; mime_map[i].extension != NULL; i++) {
+        if (strcasecmp(extension, mime_map[i].extension) == 0) {
+            return mime_map[i].content_type;
+        }
+    }
+
+    return "application/octet-stream"; // Default to binary if no match
+}
+
+int fetchr(char *resource, struct stat *st, ValueNode *credentials) {
     int status;
     size_t abs_path_len = snprintf(NULL, 0, "%s%s", webspace_path, resource);
     char abs_path[abs_path_len + 1];
@@ -227,7 +301,21 @@ int log_request(char *request, char *header) {
         return errno;
     }
 
-    fprintf(log, "Request:\n%sHeader:\n%s\n", request, header);
+    fprintf(log, "%s\n%s\n\n", request, header);
     fclose(log);
     return 0;
+}
+
+char *htaccess_from_form(char *form_path) {
+    size_t htaccess_len = strlen(form_path); // Form path and .htaccess path have same len
+    char *htaccess_path = calloc(htaccess_len + 1, sizeof(char));
+
+    // Copy the directory part and append ".htaccess"
+    strcat(htaccess_path, dirname(form_path));
+    strcat(htaccess_path, "/.htaccess");
+
+    char *absolute_htaccess_path = get_absolute_path(htaccess_path);
+    free(htaccess_path);
+    
+    return absolute_htaccess_path;
 }

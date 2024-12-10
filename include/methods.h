@@ -11,14 +11,10 @@ struct stat;
 // request processing methods
 char *get(char* path, struct stat *st);
 
-char *head(struct stat *st, int code);
+char *head(struct stat *st, int code, const char *content_type);
 
 char *options(struct stat *st, int code);
 
-int trace(const char *web_path, const char *resource, const char *message);
-
 char *error_handler(int code);
-
-char *auth();
 
 #endif

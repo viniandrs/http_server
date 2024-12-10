@@ -23,14 +23,14 @@ extern void yy_scan_string(const char *s);
 extern void yylex_destroy(void);
 
 // handle the http request
-void process_request(char* request, int client_socket_fd) {
+void process_request(char* request, char *request_body,  int client_socket_fd) {
     // pointers to address of body and header strings
     char **body_addr = malloc(sizeof(char *));
     char **header_addr = malloc(sizeof(char *));
 
     // parse the request to get the body and header
     yy_scan_string(request);
-    yyparse(request, &body_addr, &header_addr);
+    yyparse(request, request_body, &body_addr, &header_addr);
     yylex_destroy();
 
     char *body = *body_addr;
@@ -91,7 +91,7 @@ void* handle_request_thread(void* arg) {
     fds[0].fd = client_socket;
     fds[0].events = POLLIN;
 
-    // Reading the request until it is ended with a double CRLF or a timeout
+    // Reading the request until it is ended with a double CRLF, double new_line or a timeout
     int n, n_bytes, total_bytes_read = 0;
     request = (char *)calloc(request_len, sizeof(char));
     while (1) {
@@ -132,9 +132,11 @@ void* handle_request_thread(void* arg) {
             strcat(request, buffer);
 
             // if the request is ended with a double CRLF, process it
-            if (strstr(request, "\r\n\r\n") != NULL) {
-                // printf("Received request:\n%s\nStarting to parse...\n", request);
-                process_request(request, client_socket);
+            char *crlf;
+            if ((crlf = strstr(request, "\r\n\r\n")) != NULL) {
+                crlf[2] = '\0'; // End the request string
+                char *request_body = crlf + 4;
+                process_request(request, request_body, client_socket);
                 close(client_socket);
                 free(request);
                 current_thread--;

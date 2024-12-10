@@ -16,11 +16,11 @@ int main(int argc, char *argv[]) {
     }
     
     const int port = atoi(argv[1]); 
-    char *raw_webspace_path = argv[2];
+    char *unf_webspace_path = argv[2];
     const int max_threads = atoi(argv[3]);
     log_file = argv[4];  
 
-    webspace_path = format_webspace_path(raw_webspace_path);
+    webspace_path = format_webspace_path(unf_webspace_path);
 
     // Clearing log file
     FILE *pFile;
