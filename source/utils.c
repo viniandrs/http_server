@@ -70,7 +70,6 @@ int fetchr(char *resource, ValueNode *credentials) {
         token = strtok_r(NULL, "/", &resolved_resource_path);
     }
     
-    free(resolved_resource_path);
     if (status != 200) {
         return status;
     }
@@ -219,7 +218,7 @@ int write_buffer(char *buffer, int n_bytes, int fd) {
         close(fd);
         return errno;
     }
-    printf("Sent buffer with size of %d bytes\n", bytes_written);
+    printf("Sent buffer with size of %ld bytes\n", bytes_written);
     return 0;
 }
 

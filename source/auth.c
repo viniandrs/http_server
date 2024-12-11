@@ -97,7 +97,6 @@ char *get_userfile_abs_path(char *htacces_abs_path, char *AuthUserFile) {
 }
 
 int parse_hash(char *hash, int *n, char *salt) {
-    printf("Parsing hash %s\n", hash);
     char *copy = strdup(hash);
     char *token = strtok_r(copy, "$", &copy);
 
@@ -131,7 +130,7 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
 
     char *username, *password, *encoded_credentials, *decoded_credentials, *file_hash, *credentials_hash;
     int SHA_n;
-    char user_line[1024], salt[128], crypt_prefix[32];
+    char user_line[1024], salt[128], crypt_prefix[256];
 
     // Iterate over the credentials
     while (credentials != NULL) {
@@ -155,11 +154,11 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
                 }
 
                 // Compare the hashes
-                snprintf(crypt_prefix, 128, "$%d$%s$", SHA_n, salt);
+                snprintf(crypt_prefix, 256, "$%d$%s$", SHA_n, salt);
                 credentials_hash = crypt(password, crypt_prefix);
                 // printf("hash of credentials: |%s|\n", credentials_hash);
                 // printf("hash in file: |%s|\n", file_hash);
-                printf("Comparing hashes: %d", strncmp(file_hash, credentials_hash, strlen(file_hash)));
+                printf("Comparing hashes: %d\n", strncmp(file_hash, credentials_hash, strlen(file_hash)));
                 if (strncmp(file_hash, credentials_hash, strlen(file_hash)) == 0) {
                     fclose(user_file_ptr);
                     return 1; // Credentials match
@@ -191,7 +190,6 @@ int check_credentials(char *htaccess_abs_path, ValueNode* credentials) {
     // Check if the user file exists
     char *userfile_abs_path;
     userfile_abs_path = get_userfile_abs_path(htaccess_abs_path, AuthUserFile);
-    printf("User file: %s\n", userfile_abs_path);
     if (access(userfile_abs_path, F_OK) != 0) {
         printf("User file not found at %s\n", userfile_abs_path);
         return 0;
@@ -266,22 +264,18 @@ char *get_realm(char *resource, ValueNode* credentials) {
             if(!credentials){
                 realm = get_field_from_htaccess(htaccess_path, "AuthName");
                 if (!realm) {
-                    fprintf(stderr, "AuthName directive not found in .htaccess file located at %s\n", htaccess_path);
-                    free(resolved_resource_path);
+                    fprintf(stderr, "AuthName directive not found in .htaccess file located at %s\n", htaccess_path);        
                     return NULL;
-                }
-                free(resolved_resource_path);
+                }    
                 return realm;    
             } 
             // Credentials provided but don't match the ones in the .htaccess file
             else if (!check_credentials(htaccess_path, credentials)) {
                 realm = get_field_from_htaccess(htaccess_path, "AuthName");
                 if (!realm) {
-                    fprintf(stderr, "AuthName directive not found in .htaccess file.\n");
-                    free(resolved_resource_path);
+                    fprintf(stderr, "AuthName directive not found in .htaccess file.\n");        
                     return NULL;
-                }
-                free(resolved_resource_path);
+                }    
                 return realm;    
             }
             printf("Access granted for %s\n", htaccess_path);
