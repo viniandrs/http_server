@@ -14,7 +14,7 @@ FieldNode *get_field(FieldNode *field_list, char *field) {
     return NULL;
 }
 
-FieldNode *create_node(char *field, ValueNode *value_list) {
+FieldNode *create_field(char *field, ValueNode *value_list) {
     FieldNode *new_node = malloc(sizeof(FieldNode));
     new_node->field = strdup(field);
     new_node->values = value_list;
@@ -23,7 +23,27 @@ FieldNode *create_node(char *field, ValueNode *value_list) {
     return new_node;
 }
 
-FieldNode *add_node(FieldNode* field_list, FieldNode *new_node) {
+FieldNode *append_field(FieldNode* field_list, char *field_name, ValueNode *value_list) {
+    FieldNode *new_node = create_field(field_name, value_list);
+
+    if (!field_list){
+        field_list = new_node;
+        return field_list;
+    }
+    if (!new_node) {
+        return field_list;
+    }
+
+    // add the new node to the end of the list
+    FieldNode *current_node = field_list;
+    while(current_node->next != NULL) {
+        current_node = current_node->next;
+    }
+    current_node->next = new_node;
+    return field_list;
+}
+
+FieldNode *append_field_node(FieldNode* field_list, FieldNode *new_node) {    
     if (!field_list){
         field_list = new_node;
         return field_list;
@@ -64,11 +84,11 @@ void dump(FieldNode *field_list) {
 }
 
 void dump_values(ValueNode *value_list) {
-    ValueNode *current_node = value_list;
-    if (!current_node) {
+    if (!value_list) {
         printf("Empty list\n");
         return;
     }
+    ValueNode *current_node = value_list;
     
     while (current_node->next != NULL) {
         printf("Value: %s\n", current_node->value);
@@ -77,7 +97,7 @@ void dump_values(ValueNode *value_list) {
     printf("Value: %s\n", current_node->value);
 }
 
-ValueNode* add_value(ValueNode *value_list, char *value) {
+ValueNode* append_value(ValueNode *value_list, const char *value) {
     ValueNode *new_node = malloc(sizeof(ValueNode));
     new_node->value = strdup(value);
     new_node->next = NULL;

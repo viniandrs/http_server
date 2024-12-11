@@ -1,3 +1,3 @@
 bison -d ../parser.y
 flex ../lexer.l
-gcc -o server lex.yy.c -ggdb3 parser.tab.c ../source/*.c ../main.c -lfl -pthread
+gcc -ggdb3 ../source/*.c ../main.c parser.tab.c lex.yy.c -lfl -pthread -o server

@@ -1,5 +1,5 @@
 #include "../include/lists.h"
-#include "../include/methods.h"
+#include "../include/path.h"
 #include "../include/utils.h"
 #include "../include/auth.h"
 
@@ -17,220 +17,150 @@
 
 extern char *log_file, *webspace_path;
 
-char *format_webspace_path(char *webspace_path) {
-    // Temporary buffer for the resolved absolute path
-    char resolved_webspace_path[1024];
-
-    // If webspace_path ends with '/', remove it
-    char *path = strdup(webspace_path); // Make a copy of the input string
-    if (path[strlen(path) - 1] == '/') {
-        path[strlen(path) - 1] = '\0';
+int fetchr(char *resource, ValueNode *credentials) {
+    if (!is_in_webspace(resource)) {
+        return 403;  // Forbidden
     }
 
-    // Get the absolute path of the webspace
-    if (realpath(path, resolved_webspace_path) == NULL) {
-        // Handle the case where realpath fails
-        free(path);
-        return NULL;  // Or handle error appropriately
-    }
-
-    // Dynamically allocate memory for the resulting path
-    char *formatted_path = strdup(resolved_webspace_path);
-
-    // Free the temporary path copy and return the formatted path
-    free(path);
-    return formatted_path;
-}
-
-char *format_resource_path(char *resource_unformatted) {
-    char *resource = strdup(resource_unformatted);
-
-    // if resource is ends with '/', remove it
-    if (resource[strlen(resource) - 1] == '/') {
-        resource[strlen(resource) - 1] = '\0';
-    }
-
-    return resource;
-}
-
-char *format_and_resolve_resource_path(char *resource_unformatted) {
-    char *resource = strdup(resource_unformatted);
-
-    // if resource is ends with '/', remove it
-    if (resource[strlen(resource) - 1] == '/') {
-        resource[strlen(resource) - 1] = '\0';
-    }
-
-    // concatenate with webspace path and resolve the absolute path
-    size_t abs_path_len = snprintf(NULL, 0, "%s%s", webspace_path, resource);
-    char *abs_path = calloc(abs_path_len + 1, sizeof(char));
-    sprintf(abs_path, "%s%s", webspace_path, resource);
-
-    return abs_path;
-}
-
-char *get_absolute_path(char *relative_path) {
-    // Temporary buffer for the resolved absolute path
-    char resolved_path[1024];
-
-    // Get the absolute path of the resource
-    if (realpath(relative_path, resolved_path) == NULL) {
-        // Handle the case where realpath fails
-        printf("Error while resolving the absolute path: %s\n", strerror(errno));
-        return NULL; 
-    }
-
-    // Dynamically allocate memory for the resulting path
-    char *absolute_path = strdup(resolved_path);
-
-    return absolute_path;    
-}
-
-const char *get_content_type(const char *filepath) {
-    // File extension map
-    struct {
-        const char *extension;
-        const char *content_type;
-    } mime_map[] = {
-        { "gif", "image/gif" },
-        { "png", "image/png" },
-        { "jpg", "image/jpeg" },
-        { "jpeg", "image/jpeg" },
-        { "tif", "image/tiff" },
-        { "tiff", "image/tiff" },
-        { "pdf", "application/pdf" },
-        { "zip", "application/zip" },
-        { "html", "text/html" },
-        { "txt", "text/plain" },
-        { "odt", "application/vnd.oasis.opendocument.text" },
-        { NULL, NULL }  // Sentinel value
-    };
-
-    // Extract the file extension
-    const char *dot = strrchr(filepath, '.');
-    if (!dot || dot == filepath) {
-        return "application/octet-stream"; // Default to binary if no extension
-    }
-    const char *extension = dot + 1;
-
-    // Match the extension to a known content type
-    for (int i = 0; mime_map[i].extension != NULL; i++) {
-        if (strcasecmp(extension, mime_map[i].extension) == 0) {
-            return mime_map[i].content_type;
-        }
-    }
-
-    return "application/octet-stream"; // Default to binary if no match
-}
-
-int fetchr(char *resource, struct stat *st, ValueNode *credentials) {
     int status;
-    size_t abs_path_len = snprintf(NULL, 0, "%s%s", webspace_path, resource);
-    char abs_path[abs_path_len + 1];
-    sprintf(abs_path, "%s%s", webspace_path, resource);
+    size_t max_len = strlen(webspace_path) + strlen(resource) + 1;
                         
     // Tokenize the resource path by '/'
     char *token;
-    char *resource_copy = strdup(resource);  // Duplicate the string as strtok modifies it
-    char partial_path[strlen(abs_path) + 1];
-    char htaccess_path[strlen(abs_path) + 11];
-    char real_path[strlen(abs_path) + 1];
+    char *resolved_resource_path = resolve_resource_path(resource);  // Duplicate the string as strtok modifies it
+    char partial_path[max_len];
+    char htaccess_path[max_len];
     strcpy(partial_path, webspace_path);
 
     // The first dir to fetch is the webspace itself
-    status = fetch(partial_path, st);
+    status = fetch(partial_path);
+    printf("Status for %s: %d\n", partial_path, status);
+    if (status != 200) {
+        return status;
+    }
 
     // Fetching recursively each directory in the path until the final file
-    token = strtok(resource_copy, "/");
+    token = strtok(resolved_resource_path, "/");
     while (token != NULL && status == 200) {
         // Append the token (directory) to the partial path
         strcat(partial_path, "/");
         strcat(partial_path, token);
 
-        // checking if the webspace path is in the beginning of the real path
-        // if it's not, the resource is trying to access a file outside the webspace
-        realpath(partial_path, real_path);
-        if (strncmp(webspace_path, real_path, strlen(webspace_path)) != 0) {
-            status = 403;  // Forbidden
-            break;
-        }
-
         // checking if the resource is protected by .htaccess file
-        sprintf(htaccess_path, "%s%s", partial_path, "/.htaccess");
-        if (access(htaccess_path, F_OK) != -1) {
-            // if the credentials match the ones in the .htaccess file, continue
-            printf("Checking credentials for %s\n", htaccess_path);
-            printf("Credentials provided: ");
-            dump_values(credentials);
-            if (!check_credentials(htaccess_path, credentials)) {
+        if (is_dir_protected(partial_path)) {
+            printf("Directory is protected by %s%s\n", partial_path, "/.htaccess");
+            strcat(htaccess_path, partial_path);
+            strcat(htaccess_path, "/.htaccess");
+            if (!credentials){
+                printf("No credentials provided\n");
+                return 401;  // Forbidden
+            } else if (!check_credentials(htaccess_path, credentials)) {
                 printf("Access denied for %s\n", htaccess_path);
-                status = 401;  // Forbidden
-                break;
+                return 401;  // Forbidden
             }
+            printf("Access granted for %s\n", htaccess_path);
+            htaccess_path[0] = '\0';
         }
-        htaccess_path[0] = '\0';
 
         // Fetch the resource
-        status = fetch(real_path, st);
+        printf("Fetching %s\n", partial_path);
+        status = fetch(partial_path);
         printf("Status for %s: %d\n", partial_path, status);
 
         // Move to the next token (directory or file)
         token = strtok(NULL, "/");
     }
+    
+    if (status != 200) {
+        return status;
+    }
 
     // if the final file is a directory, fetch for index.html or welcome.html
-    if (S_ISDIR(st->st_mode) && status == 200) {
+    struct stat st;
+    stat(partial_path, &st);
+    if (S_ISDIR(st.st_mode)) {
         printf("fetching for index.html or welcome.html in dir %s\n", partial_path);
-        DIR *dir = opendir(partial_path);
-        struct dirent *entry;
-        int file_found = 0;
 
-        // checking if there's a .htaccess file in the directory
-        sprintf(htaccess_path, "%s%s", partial_path, "/.htaccess");
-        if (access(htaccess_path, F_OK) != -1) {
-            // checking credentials
-            printf("Checking credentials for %s\n", htaccess_path);
-            printf("Credentials provided: ");
-            dump_values(credentials);
-            if (!check_credentials(htaccess_path, credentials)) {
+        // checking if the resource is protected by .htaccess file
+        if (is_dir_protected(partial_path)) {
+            printf("Directory is protected by %s%s\n", partial_path, "/.htaccess");
+            strcat(htaccess_path, partial_path);
+            strcat(htaccess_path, "/.htaccess");
+            if (!credentials){
+                printf("No credentials provided\n");
+                return 401;  // Forbidden
+            } else if (!check_credentials(htaccess_path, credentials)) {
                 printf("Access denied for %s\n", htaccess_path);
-                status = 401;  // Forbidden
+                return 401;  // Forbidden
             }
+            printf("Access granted for %s\n", htaccess_path);
         }
-
+        
         char *dir_path = strdup(partial_path);
-        while ((entry = readdir(dir)) != NULL) {
-            if ((strcmp(entry->d_name, "index.html") == 0) 
-            ||  (strcmp(entry->d_name, "welcome.html") == 0)) {
-                
-                strcat(partial_path, "/");
-                strcat(partial_path, entry->d_name);
-                file_found = 1;
-                status = fetch(partial_path, st);
-                printf("Found %s with status %d\n", partial_path, status);
-                
-                if(status == 200) break;
-
-                // if the first file found is not accessible, keep looking for the another one
-                strcpy(partial_path, dir_path);
-            }
+        printf("Checking for index.html or welcome.html in %s\n", dir_path);    
+        if ((status = check_for_file_in_dir(dir_path, "index.html")) == 200) {
+            free(dir_path);
+            return 200;
         }
-        // return the st pointer to directory
-        stat(dir_path, st);
+        if ((status = check_for_file_in_dir(dir_path, "welcome.html")) == 200) {
+            free(dir_path);
+            return 200;
+        }
+        
         free(dir_path);
-        closedir(dir);
-        if (!file_found) status = 404; // Not found
+        return status; 
     }
-    free(resource_copy);
     return status;
 }
 
+int check_for_file_in_dir(char *dir_abs_path, char *filename) {
+    int status;
+    char path[1024]="";
+    DIR *dir = opendir(dir_abs_path);
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, filename) == 0) {
+            strcat(path, dir_abs_path);
+            strcat(path, "/");
+            strcat(path, entry->d_name);
+            
+            status = fetch(path);
+            printf("Status for %s: %d \n", path, status);
+
+            closedir(dir);
+            return status;
+        }
+    }
+    // file was not found
+    closedir(dir);
+    return 404;
+}
+
+int dir_has_file(char *dir_abs_path, char *filename) {
+    char path[1024]="";
+    DIR *dir = opendir(dir_abs_path);
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, filename) == 0) {
+            closedir(dir);
+            return 1;
+        }
+    }
+    // file was not found
+    closedir(dir);
+    return 0;
+}
+
 // get the header and body of a resource in the webspace. If body is NULL, only the header is returned
-int fetch(const char *path, struct stat *st) {
+int fetch(const char *abs_path) {
+    struct stat st;
+    printf("Fetching %s\n", abs_path);
     int fd;
 
     // Using stat to get file information
-    if (stat(path, st) != 0) {
+    if (stat(abs_path, &st) != 0) {
         if (errno == ENOENT) {
             return 404; // Not found
         } else {
@@ -240,15 +170,15 @@ int fetch(const char *path, struct stat *st) {
     }
 
     // if the resource is a regular file
-    if (S_ISREG(st->st_mode)) { 
+    if (S_ISREG(st.st_mode)) { 
         // check for read permission with bitmask S_IRUSR (Read permission, owner) 
-        if (!(st->st_mode & S_IRUSR)) {
+        if (!(st.st_mode & S_IRUSR)) {
             return 403; // Forbidden
         }
 
         // open it in read-only mode
-        fd = open(path, O_RDONLY);
-        if ((fd = open(path, O_RDONLY)) == -1) {
+        fd = open(abs_path, O_RDONLY);
+        if ((fd = open(abs_path, O_RDONLY)) == -1) {
             printf("Open error: %s\n", strerror(errno));
             return 500;  // Internal server error
         }
@@ -258,14 +188,14 @@ int fetch(const char *path, struct stat *st) {
     } 
 
     // if the resource is a directory
-    else if (S_ISDIR(st->st_mode)) {
+    else if (S_ISDIR(st.st_mode)) {
         // check if it has execution permission with bitmask S_IXUSR (Execute (for ordinary files) or search (for directories))
-        if (!(st->st_mode & S_IXUSR)) {
+        if (!(st.st_mode & S_IXUSR)) {
             return 403; // Forbidden
         }
 
         // Open the directory
-        DIR *dir = opendir(path);
+        DIR *dir = opendir(abs_path);
         if (!dir) {
             printf("Open dir error: %s\n", strerror(errno));
             return 500;  // Internal server error
@@ -279,18 +209,17 @@ int fetch(const char *path, struct stat *st) {
     return 500;  // Internal server error
 }
 
-int send_page(char *response, int socket_fd) {
-    int response_len = strlen(response);
-    int n_bytes;
+int write_buffer(char *buffer, int n_bytes, int fd) {
+    printf("Writing buffer to socket\n");
+    size_t bytes_written = 0;
 
     // Send the response
-    if ((n_bytes = send(socket_fd, response, response_len, 0)) < 0) {
+    if ((bytes_written = send(fd, buffer, n_bytes, 0)) < 0) {
         printf("Send error: %s\n", strerror(errno));
-        close(socket_fd);
+        close(fd);
         return errno;
     }
-    printf("Sent response with size of %d bytes\n", n_bytes);
-    close(socket_fd);
+    printf("Sent buffer with size of %d bytes\n", bytes_written);
     return 0;
 }
 
@@ -314,7 +243,7 @@ char *htaccess_from_form(char *form_path) {
     strcat(htaccess_path, dirname(form_path));
     strcat(htaccess_path, "/.htaccess");
 
-    char *absolute_htaccess_path = get_absolute_path(htaccess_path);
+    char *absolute_htaccess_path = get_resource_abs_path(htaccess_path);
     free(htaccess_path);
     
     return absolute_htaccess_path;

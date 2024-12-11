@@ -12,6 +12,18 @@
 
 extern char *webspace_path;
 
+int is_dir_protected(char *dir_abs_path) {
+    char htaccess_path[1024];
+    strcat(htaccess_path, dir_abs_path);
+    strcat(htaccess_path, "/.htaccess");
+
+    printf("Checking for .htaccess in: %s\n", htaccess_path);
+    if (access(htaccess_path, F_OK) != -1) {
+        return 1;
+    }
+    return 0;
+}
+
 char *get_field_from_htaccess(char *htaccess_path, char *field) {
     FILE *htaccess_file = fopen(htaccess_path, "r");
     if (!htaccess_file) {
@@ -69,39 +81,6 @@ char *base64_decode(const char *input) {
 
     decoded[j] = '\0';
     return decoded;
-}
-
-char *header_401_unauthorized(char *resource, ValueNode* credentials) {
-    // get the current date
-    struct timeval tv;
-    struct tm *tm_info;
-    char time[30];
-
-    gettimeofday(&tv, NULL);    
-    tm_info = localtime(&tv.tv_sec); // Convert it to UTC time
-    strftime(time, sizeof(time), "%a, %d %b %Y %H:%M:%S BRT", tm_info); // Format the time according to the HTTP date format
-
-    // get the authentication realm
-    char *realm = get_realm(resource, credentials);
-
-    size_t header_len = snprintf(NULL, 0,
-"HTTP/1.1 401 Authorization Required\n\
-Date: %s\n\
-Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
-Transfer-Encoding: chunked\n\
-Content-Type: text/html\n\
-WWW-Authenticate: Basic realm=%s\n\
-Enter password for realm %s", time, realm, realm);
-    char *header = malloc(header_len + 1);
-    sprintf(header,
-"HTTP/1.1 401 Authorization Required\n\
-Date: %s\n\
-Server: Vinicius Andreossi's Simple HTTP Server v0.1\n\
-Transfer-Encoding: chunked\n\
-Content-Type: text/html\n\
-WWW-Authenticate: Basic realm=%s\n\
-Enter password for realm %s", time, realm, realm);
-    return header;
 }
 
 int check_credentials(char *htaccess_path_original, ValueNode* credentials) {

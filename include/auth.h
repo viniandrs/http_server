@@ -3,9 +3,10 @@
 
 #include "lists.h"
 
-char *base64_decode(const char *input);
+/* Check if a directory is protected by a .htaccess file. */
+int is_dir_protected(char *dir_abs_path);
 
-char *header_401_unauthorized(char *resource, ValueNode* credentials);
+char *base64_decode(const char *input);
 
 /* Return the realm from the first protected directory which the credentials
 from the list do not match */

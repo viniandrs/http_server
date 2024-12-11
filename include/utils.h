@@ -4,28 +4,22 @@
 #include "lists.h"
 #include <sys/stat.h>
 
-/* Fetch recursively each directory in the path until the final file. */
-int fetchr(char *resource, struct stat *st, ValueNode *credentials);
+/* Fetch recursively each directory in the path until the final file. Return the status. */
+int fetchr(char *resource, ValueNode *credentials);
 
-int fetch(const char *path, struct stat *_st);
+/* Fetch directly a single file. Return the status. */
+int fetch(const char *path);
 
-/* Format the webspace path and resolve the absolute path. */
-char *format_webspace_path(char *webspace_path);
+/* Fetch a single file in a directory. Return the status. */
+int check_for_file_in_dir(char *dir_abs_path, char *filename);
 
-/* Format the resource path */
-char *format_resource_path(char *resource);
+/* Check if a directory has a file. Return 1 if it has, 0 otherwise. */
+int dir_has_file(char *dir_abs_path, char *filename);
 
-/* Format the resource path and resolve the absolute path */
-char *format_and_resolve_resource_path(char *resource);
-
-char *get_absolute_path(char *resource);
-
-int send_page(char *body, int socket_fd);
+int write_buffer(char *buffer, int n_bytes, int socket_fd);
 
 int log_request(char *request, char *header);
 
 char *htaccess_from_form(char *form_path);
-
-const char *get_content_type(const char *filepath);
 
 #endif

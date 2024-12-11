@@ -12,6 +12,7 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 #include "../include/lists.h"
+#include "../include/request_processing.h"
 
 #include "../build/parser.tab.h"
 
@@ -24,28 +25,90 @@ extern void yylex_destroy(void);
 
 // handle the http request
 void process_request(char* request, char *request_body,  int client_socket_fd) {
-    // pointers to address of body and header strings
-    char **body_addr = malloc(sizeof(char *));
-    char **header_addr = malloc(sizeof(char *));
+    // printing request details on the screen
+    printf("\nReceived request:\n%s\nwith request body:\n%s\n\n", request, request_body);
+    FieldNode *field_list;
+    char *method, *resource;
+
+    FieldNode **field_list_addr = malloc(sizeof(FieldNode*));
+    char **method_addr = malloc(sizeof(char*));
+    char **filepath_addr = malloc(sizeof(char*));
 
     // parse the request to get the body and header
     yy_scan_string(request);
-    yyparse(request, request_body, &body_addr, &header_addr);
+    yyparse(method_addr, filepath_addr, field_list_addr);
     yylex_destroy();
 
-    char *body = *body_addr;
-    char *header = *header_addr;
+    field_list = *field_list_addr;
+    method = *method_addr;
+    resource = *filepath_addr;
 
-    size_t reponse_len = snprintf(NULL, 0, "%s\n\n%s", header, body);
-    char reponse[reponse_len + 1];
-    sprintf(reponse, "%s\n\n%s", header, body);
+    // getting header
+    int status;
+    printf("Getting header...\n");
+    char *header = get_header(resource, field_list, &status);
+    printf("Header: \n%s\n", header);
+    if (write_buffer(header, strlen(header), client_socket_fd) != 0) {
+        printf("Error while writing header in socket: %s\n", strerror(errno));
+        close(client_socket_fd);
+        return;
+    }
 
-    // Send response to browser
-    send_page(reponse, client_socket_fd);    
+    printf("Status: %d; Method: %s; Resource: %s\n", status, method, resource);
+    // sending the resource according to the HTTP method
+    if ((status != 200) && (status != 201)) {
+        send_error_file(status, client_socket_fd); // if the status is not 200 or 201, send the error body
+    } else {
+        if (strcmp(method, "GET") == 0) {
+            // send the resource
+            if (send_file(resource, client_socket_fd)) {
+                printf("Error while sending file: %s\n", strerror(errno));
+                close(client_socket_fd);
+                return;
+            }
+        } else if (strcmp(method, "HEAD") == 0) {
+            // send only the header
+            if (write_buffer(NULL, 0, client_socket_fd)) {
+                printf("Error while writing header in socket: %s\n", strerror(errno));
+                close(client_socket_fd);
+                return;
+            }
+        } else if (strcmp(method, "TRACE") == 0) {
+            // write the request back to the client
+            size_t body_len = strlen(request) + strlen(request_body) + 2;
+            char body[body_len];
+            strcpy(body, request);
+            strcat(body, "\r\n");
+            strcat(body, request_body);
+
+            if (write_buffer(body, strlen(body), client_socket_fd)) {
+                printf("Error while writing body in socket: %s\n", strerror(errno));
+                close(client_socket_fd);
+                return;
+            }
+        } else if (strcmp(method, "OPTIONS") == 0) {
+            // send only the header
+            if (write_buffer(NULL, 0, client_socket_fd)) {
+                printf("Error while writing header in socket: %s\n", strerror(errno));
+                close(client_socket_fd);
+                return;
+            }
+        } else if (strcmp(method, "POST") == 0) {
+            send_error_file(501, client_socket_fd); // Not implemented
+        } else {
+            send_error_file(501, client_socket_fd); // Not implemented
+        }
+    }   
+    close(client_socket_fd);
     log_request(request, header);
 
-    // free(body);
-    // free(header);
+    free(header);
+    free(method);
+    free(resource);
+    free(field_list_addr);
+    free(method_addr);
+    free(filepath_addr);
+    free_field_list(field_list);
 }
 
 int open_socket(int port, struct sockaddr_in *addr) {
