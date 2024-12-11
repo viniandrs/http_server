@@ -11,7 +11,7 @@ int fetchr(char *resource, ValueNode *credentials);
 int fetch(const char *path);
 
 /* Fetch a single file in a directory. Return the status. */
-int check_for_file_in_dir(char *dir_abs_path, char *filename);
+int fetch_for_file_in_dir(char *dir_abs_path, char *filename);
 
 /* Check if a directory has a file. Return 1 if it has, 0 otherwise. */
 int dir_has_file(char *dir_abs_path, char *filename);

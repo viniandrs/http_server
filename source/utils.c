@@ -23,14 +23,14 @@ int fetchr(char *resource, ValueNode *credentials) {
     }
 
     int status;
-    size_t max_len = strlen(webspace_path) + strlen(resource) + 1;
                         
     // Tokenize the resource path by '/'
     char *token;
     char *resolved_resource_path = resolve_resource_path(resource);  // Duplicate the string as strtok modifies it
-    char partial_path[max_len];
-    char htaccess_path[max_len];
+    char partial_path[1024];
+    char htaccess_path[1024];
     strcpy(partial_path, webspace_path);
+    htaccess_path[0] = '\0';
 
     // The first dir to fetch is the webspace itself
     status = fetch(partial_path);
@@ -40,7 +40,7 @@ int fetchr(char *resource, ValueNode *credentials) {
     }
 
     // Fetching recursively each directory in the path until the final file
-    token = strtok(resolved_resource_path, "/");
+    token = strtok_r(resolved_resource_path, "/", &resolved_resource_path);
     while (token != NULL && status == 200) {
         // Append the token (directory) to the partial path
         strcat(partial_path, "/");
@@ -52,25 +52,25 @@ int fetchr(char *resource, ValueNode *credentials) {
             strcat(htaccess_path, partial_path);
             strcat(htaccess_path, "/.htaccess");
             if (!credentials){
-                printf("No credentials provided\n");
+                printf("No credentials provided. Returning status 401\n");
                 return 401;  // Forbidden
             } else if (!check_credentials(htaccess_path, credentials)) {
-                printf("Access denied for %s\n", htaccess_path);
+                printf("Access denied. Returing status 401\n");
                 return 401;  // Forbidden
             }
-            printf("Access granted for %s\n", htaccess_path);
+            printf("Access granted\n");
             htaccess_path[0] = '\0';
         }
 
         // Fetch the resource
-        printf("Fetching %s\n", partial_path);
         status = fetch(partial_path);
         printf("Status for %s: %d\n", partial_path, status);
 
         // Move to the next token (directory or file)
-        token = strtok(NULL, "/");
+        token = strtok_r(NULL, "/", &resolved_resource_path);
     }
     
+    free(resolved_resource_path);
     if (status != 200) {
         return status;
     }
@@ -96,13 +96,14 @@ int fetchr(char *resource, ValueNode *credentials) {
             printf("Access granted for %s\n", htaccess_path);
         }
         
+        // look for index.html or welcome.html
         char *dir_path = strdup(partial_path);
         printf("Checking for index.html or welcome.html in %s\n", dir_path);    
-        if ((status = check_for_file_in_dir(dir_path, "index.html")) == 200) {
+        if ((status = fetch_for_file_in_dir(dir_path, "index.html")) == 200) {
             free(dir_path);
             return 200;
         }
-        if ((status = check_for_file_in_dir(dir_path, "welcome.html")) == 200) {
+        if ((status = fetch_for_file_in_dir(dir_path, "welcome.html")) == 200) {
             free(dir_path);
             return 200;
         }
@@ -113,7 +114,7 @@ int fetchr(char *resource, ValueNode *credentials) {
     return status;
 }
 
-int check_for_file_in_dir(char *dir_abs_path, char *filename) {
+int fetch_for_file_in_dir(char *dir_abs_path, char *filename) {
     int status;
     char path[1024]="";
     DIR *dir = opendir(dir_abs_path);
@@ -156,7 +157,6 @@ int dir_has_file(char *dir_abs_path, char *filename) {
 // get the header and body of a resource in the webspace. If body is NULL, only the header is returned
 int fetch(const char *abs_path) {
     struct stat st;
-    printf("Fetching %s\n", abs_path);
     int fd;
 
     // Using stat to get file information

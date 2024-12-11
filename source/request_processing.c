@@ -44,7 +44,7 @@ char *get_header(char *resource, FieldNode *field_list, int *status) {
             header_list = headers_201_created();
             break;
         case 401:
-            header_list = headers_401_unauthorized(resource_abs_path, credentials);
+            header_list = headers_401_unauthorized(resource, credentials);
             break;
         case 403:
             header_list = headers_403_forbidden(&st);
@@ -64,6 +64,8 @@ char *get_header(char *resource, FieldNode *field_list, int *status) {
 }
 
 int send_error_file(int status, int fd) {
+    if (status == 401) return 0;
+    
     struct stat st;
     size_t content_length;
     FieldNode *header_list = NULL;
@@ -71,9 +73,9 @@ int send_error_file(int status, int fd) {
 
     // Get the error file based on the status
     switch (status) {
-        case 401:
-            error_message_path = "/status_pages/unauthorized.html";
-            break;
+        // case 401:
+        //     error_message_path = "/status_pages/unauthorized.html";
+        //     break;
         case 403:
             error_message_path = "/status_pages/forbidden.html";
             break;

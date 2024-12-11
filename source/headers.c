@@ -125,7 +125,7 @@ FieldNode *headers_201_created() {
     return header_list;
 }
 
-FieldNode *headers_401_unauthorized(char *filepath, ValueNode *credentials) {
+FieldNode *headers_401_unauthorized(char *resource, ValueNode *credentials) {
     FieldNode *header_list = NULL;
 
     // Add the status line
@@ -141,8 +141,12 @@ FieldNode *headers_401_unauthorized(char *filepath, ValueNode *credentials) {
     header_list = append_field(header_list, "Connection", get_connection());
 
     // Add the WWW-Authenticate field
-    const char *realm = NULL;// get_realm(filepath, credentials);
-    header_list = append_field(header_list, "WWW-Authenticate", append_value(NULL, realm));
+    char auth[128] = "Basic realm=";
+    const char *realm = get_realm(resource, credentials);
+    if (!realm) realm = "Restricted";
+
+    strcat(auth, realm);
+    header_list = append_field(header_list, "WWW-Authenticate", append_value(NULL, auth));
 
     return header_list;
 }
