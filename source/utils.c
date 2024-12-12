@@ -53,9 +53,11 @@ int fetchr(char *resource, ValueNode *credentials) {
             strcat(htaccess_path, "/.htaccess");
             if (!credentials){
                 printf("No credentials provided. Returning status 401\n");
+                // free(resolved_resource_path);
                 return 401;  // Forbidden
             } else if (!check_credentials(htaccess_path, credentials)) {
                 printf("Access denied. Returing status 401\n");
+                // free(resolved_resource_path);
                 return 401;  // Forbidden
             }
             printf("Access granted\n");
@@ -69,10 +71,9 @@ int fetchr(char *resource, ValueNode *credentials) {
         // Move to the next token (directory or file)
         token = strtok_r(NULL, "/", &resolved_resource_path);
     }
-    
-    if (status != 200) {
-        return status;
-    }
+
+    // if(token != NULL) free(resolved_resource_path);
+    if (status != 200) return status;
 
     // if the final file is a directory, fetch for index.html or welcome.html
     struct stat st;

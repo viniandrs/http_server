@@ -12,4 +12,9 @@ int send_file(char *filepath, int fd);
 /* Send the error file to the client. */
 int send_error_file(int status, int fd);
 
+/* Extract values from a POST request body. */
+char **parse_request_body(const char *body);
+
+void free_data_array(char **data_array);
+
 #endif

@@ -13,6 +13,7 @@
 #include "../include/utils.h"
 #include "../include/lists.h"
 #include "../include/request_processing.h"
+#include "../include/auth.h"
 
 #include "../build/parser.tab.h"
 
@@ -45,8 +46,10 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
 
     // getting header
     int status;
+    char *header;
     printf("Getting header...\n");
-    char *header = get_header(resource, field_list, &status);
+    header = get_header(resource, field_list, &status);
+    
     printf("Header: \n%s\n", header);
     if (write_buffer(header, strlen(header), client_socket_fd) != 0) {
         printf("Error while writing header in socket: %s\n", strerror(errno));
@@ -94,10 +97,25 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
                 return;
             }
         } else if (strcmp(method, "POST") == 0) {
-            send_error_file(501, client_socket_fd); // Not implemented
+            printf("Parsing request body...\n");
+            char **values = parse_request_body(request_body);
+
+            status = 201;
+            if(!update_passwords(resource, values)) {
+                // password not changed
+                printf("Error while changing password\n");
+                send_file("/status_pages/password_not_updated.html", client_socket_fd);
+                
+            } else {
+                printf("Password changed successfully!\n");
+                send_file("/status_pages/password_updated.html", client_socket_fd);
+            }
+
+            free_data_array(values);
         } else {
             send_error_file(501, client_socket_fd); // Not implemented
         }
+        
     }   
     close(client_socket_fd);
     log_request(request, header);
