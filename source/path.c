@@ -51,7 +51,8 @@ char *resolve_resource_path(char *resource_path) {
 
     // Remove the webspace path from the resolved path
     char *resolved_path;
-    resolved_path = abs_path + strlen(webspace_path); 
+    resolved_path = strdup(abs_path + strlen(webspace_path));
+    free(abs_path);
     return resolved_path;
 }
 

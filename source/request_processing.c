@@ -119,7 +119,7 @@ int send_error_file(int status, int fd) {
 }
 
 #define BUFFER_SIZE 32768
-int send_file(char *resource, int fd) {
+int send_file(char *resource, int fd) { // TODO: open file before the conditional
     struct stat st;
     char buffer[BUFFER_SIZE]="";
     FieldNode *header_list = NULL;
@@ -140,42 +140,37 @@ int send_file(char *resource, int fd) {
     }
     printf("Sending file %s\n", resource_abs_path);
 
+    FILE *resource_file = fopen(resource_abs_path, "r");
+    if (!resource_file) {
+        printf("Error while opening resource file: %s\n", strerror(errno));
+        free(resource_abs_path);
+        return errno;
+    }
+    free(resource_abs_path);
+
     // if the content length is smaller than the buffer size, read the whole file
     if (st.st_size < BUFFER_SIZE) {
         printf("Content length is smaller than buffer size\n");
-        FILE *resource_file = fopen(resource_abs_path, "r");
-        if (!resource_file) {
-            printf("Error while opening resource file: %s\n", strerror(errno));
-            return errno;
-        }
-        printf("reading %ld bytes\n", st.st_size);
         bytes_read = fread(buffer, 1, st.st_size, resource_file);
-        printf("buffer size: %ld\n", bytes_read);
-        fclose(resource_file);
 
         if(write_buffer(buffer, bytes_read, fd)) {
             printf("Error while writing resource file: %s\n", strerror(errno));
+            fclose(resource_file);
             return errno;
         }
     } else {
         // if the content length is bigger than the buffer size, read the file in chunks
         printf("Content length is bigger than buffer size. Sending the file in chunks...\n");
-        FILE *resource_file = fopen(resource_abs_path, "r");
-        if (resource_file == NULL) {
-            printf("Error while opening resource file: %s\n", strerror(errno));
-            return errno;
-        }
-
         while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, resource_file)) > 0) {
             if(write_buffer(buffer, bytes_read, fd)) {
                 printf("Error while writing resource file: %s\n", strerror(errno));
+                fclose(resource_file);
                 return errno;
             }
             buffer[0] = '\0';
         }
-        fclose(resource_file);
     }
-
+    fclose(resource_file);
     return 0;
 }
 

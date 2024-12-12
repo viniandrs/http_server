@@ -86,14 +86,13 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
     int SHA_n;
     char user_line[1024], salt[128], crypt_prefix[256];
 
-        // Iterate over the credentials
+    // Iterate over the credentials
     while (credentials != NULL) {
-        char *end_token;
         encoded_credentials = strdup(credentials->value + 7);
         decoded_credentials = base64_decode(encoded_credentials);
         printf("Decoded credentials: %s\n", decoded_credentials);
         password = strdup(strchr(decoded_credentials, ':') + 1);
-        username = strtok_r(decoded_credentials, ":", &end_token);
+        username = strtok_r(decoded_credentials, ":", &decoded_credentials);
         
         // Iterate over the lines in the user file
         while (fgets(user_line, sizeof(user_line), user_file_ptr)) {
@@ -155,7 +154,7 @@ int update_user_credentials(char *user_file_abs_path, char *username, char *pass
 
     // Counting lines in file
     if (!(user_file_ptr = fopen(user_file_abs_path, "r"))) {
-        perror("Error while opening user file");
+        printf("Error while opening user file: %s\n", strerror(errno));
         return 0;
     }
     while (fgets(line, sizeof(line), user_file_ptr)) {
@@ -185,7 +184,6 @@ int update_user_credentials(char *user_file_abs_path, char *username, char *pass
             lines[i] = new_line;
             user_found = 1;
         }
-        free(temp);
     }
 
     // Write the updated lines back to the file
@@ -337,10 +335,7 @@ int update_passwords(char *resource, char **values) {
 
     char *htaccess_abs_path = htaccess_abs_path_from_form(resource);
 
-    printf("htaccess_abs_path: %s\n", htaccess_abs_path);
-    printf("Checking password... %d\n", check_credentials(htaccess_abs_path, credentials));
     if (!check_credentials(htaccess_abs_path, credentials)) {
-        fprintf(stderr, "Incorrect password.\n");
         return 0;
     }
     free(credentials);
@@ -355,11 +350,8 @@ int update_passwords(char *resource, char **values) {
     }
     printf("Updating userfile located in %s\n", userfile_abs_path);
 
-    if (update_user_credentials(userfile_abs_path, username, new_password)) {
-        return 1;
-    } else {
+    if (!update_user_credentials(userfile_abs_path, username, new_password)) {
         return 0;
     }
-
     return 1;
 }

@@ -27,6 +27,7 @@ int fetchr(char *resource, ValueNode *credentials) {
     // Tokenize the resource path by '/'
     char *token;
     char *resolved_resource_path = resolve_resource_path(resource);  // Duplicate the string as strtok modifies it
+    char *p = resolved_resource_path;
     char partial_path[1024];
     char htaccess_path[1024];
     strcpy(partial_path, webspace_path);
@@ -36,6 +37,7 @@ int fetchr(char *resource, ValueNode *credentials) {
     status = fetch(partial_path);
     printf("Status for %s: %d\n", partial_path, status);
     if (status != 200) {
+        free(p);
         return status;
     }
 
@@ -51,13 +53,10 @@ int fetchr(char *resource, ValueNode *credentials) {
             printf("Directory is protected by %s%s\n", partial_path, "/.htaccess");
             strcat(htaccess_path, partial_path);
             strcat(htaccess_path, "/.htaccess");
-            if (!credentials){
-                printf("No credentials provided. Returning status 401\n");
-                // free(resolved_resource_path);
-                return 401;  // Forbidden
-            } else if (!check_credentials(htaccess_path, credentials)) {
+            
+            if (!check_credentials(htaccess_path, credentials)) {
                 printf("Access denied. Returing status 401\n");
-                // free(resolved_resource_path);
+                free(p);
                 return 401;  // Forbidden
             }
             printf("Access granted\n");
@@ -71,9 +70,10 @@ int fetchr(char *resource, ValueNode *credentials) {
         // Move to the next token (directory or file)
         token = strtok_r(NULL, "/", &resolved_resource_path);
     }
-
-    // if(token != NULL) free(resolved_resource_path);
-    if (status != 200) return status;
+    free(p); // Free the resolved_resource_path
+    if (status != 200) {
+        return status;
+    }
 
     // if the final file is a directory, fetch for index.html or welcome.html
     struct stat st;
@@ -86,10 +86,8 @@ int fetchr(char *resource, ValueNode *credentials) {
             printf("Directory is protected by %s%s\n", partial_path, "/.htaccess");
             strcat(htaccess_path, partial_path);
             strcat(htaccess_path, "/.htaccess");
-            if (!credentials){
-                printf("No credentials provided\n");
-                return 401;  // Forbidden
-            } else if (!check_credentials(htaccess_path, credentials)) {
+
+            if (!check_credentials(htaccess_path, credentials)) {
                 printf("Access denied for %s\n", htaccess_path);
                 return 401;  // Forbidden
             }
@@ -107,7 +105,6 @@ int fetchr(char *resource, ValueNode *credentials) {
             free(dir_path);
             return 200;
         }
-        
         free(dir_path);
         return status; 
     }
