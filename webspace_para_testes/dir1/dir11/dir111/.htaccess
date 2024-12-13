@@ -5,7 +5,7 @@ AuthType Basic
 AuthName "dir111"
 
 # Specify the path to the password file containing the user credentials
-AuthUserFile ../../../../.htpasswd11
+AuthUserFile ../../../../.htpasswd3
 
 # Allow specific users to access the resource
 Require valid-user

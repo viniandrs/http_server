@@ -31,9 +31,9 @@ void dump(FieldNode *field_list);
 /* Inserts the values in the end of the value list*/
 ValueNode *append_value(ValueNode *value_list, const char *value);
 
-void *free_field_list(FieldNode *field_list);
+void free_field_list(FieldNode *field_list);
 
-void *free_value_list(ValueNode *value_list);
+void free_value_list(ValueNode *value_list);
 
 void dump_values(ValueNode *field_list);
 

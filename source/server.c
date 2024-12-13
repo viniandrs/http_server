@@ -38,7 +38,11 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
 
     // parse the request to get the body and header
     yy_scan_string(request);
-    yyparse(method_addr, filepath_addr, field_list_addr);
+    if(yyparse(method_addr, filepath_addr, field_list_addr)) {
+        printf("Error while parsing the request\n");
+        close(client_socket_fd);
+        return;
+    }
     yylex_destroy();
 
     field_list = *field_list_addr;
@@ -215,18 +219,28 @@ void* handle_request_thread(void* arg) {
 
             request[REQUEST_LEN] = '\0'; // Ensure the request is null-terminated
 
-            // process the request only if is ended with a double CRLF
+            // process the request if is ended with a double CRLF (from browser)
             if ((crlf = strstr(request, "\r\n\r\n")) != NULL) {
                 crlf[2] = '\0'; // End the request string
                 char *request_body = crlf + 4;
                 process_request(request, request_body, client_socket);
-                close(client_socket);
-                
-                pthread_mutex_lock(&lock);
-                current_thread--;
-                pthread_mutex_unlock(&lock);
-                pthread_exit(NULL);
             }
+            // process the request if is ended with a single CRLF (from telnet)
+            else if ((crlf = strstr(request, "\r\n")) != NULL) {
+                crlf[2] = '\0'; // End the request string
+                char *request_body = crlf + 2;
+                process_request(request, request_body, client_socket);
+            }
+
+            else {
+                printf("Bad request\n");
+            }
+
+            close(client_socket);    
+            pthread_mutex_lock(&lock);
+            current_thread--;
+            pthread_mutex_unlock(&lock);
+            pthread_exit(NULL);
             
         } else {
             printf("Undefined poll error: %s\n", strerror(errno));

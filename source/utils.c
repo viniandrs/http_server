@@ -19,6 +19,7 @@ extern char *log_file, *webspace_path;
 
 int fetchr(char *resource, ValueNode *credentials) {
     if (!is_in_webspace(resource)) {
+        printf("checking if resource %s is in webspace\n", resource);
         return 403;  // Forbidden
     }
 
@@ -133,22 +134,6 @@ int fetch_for_file_in_dir(char *dir_abs_path, char *filename) {
     // file was not found
     closedir(dir);
     return 404;
-}
-
-int dir_has_file(char *dir_abs_path, char *filename) {
-    char path[1024]="";
-    DIR *dir = opendir(dir_abs_path);
-    struct dirent *entry;
-
-    while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, filename) == 0) {
-            closedir(dir);
-            return 1;
-        }
-    }
-    // file was not found
-    closedir(dir);
-    return 0;
 }
 
 // get the header and body of a resource in the webspace. If body is NULL, only the header is returned

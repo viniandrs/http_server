@@ -63,12 +63,20 @@ char *get_userfile_abs_path(char *htacces_abs_path, char *AuthUserFile) {
 int parse_hash(char *hash, int *n, char *salt) {
     char *copy = strdup(hash);
     char *token = strtok_r(copy, "$", &copy);
+    if(!token) {
+        printf("Error while parsing hash\n");
+        return 0;
+    }
 
     // Get n
     *n = atoi(token); // Parse the algorithm identifier as an integer
 
     // Get the salt
     token = strtok_r(NULL, "$", &copy);
+    if(!token) {
+        printf("Error while parsing hash\n");
+        return 0;
+    }
     strncpy(salt, token, 128); // Limit salt length to 128
     salt[127] = '\0'; // Ensure null-termination
 
@@ -84,7 +92,7 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
 
     char *username, *password, *encoded_credentials, *decoded_credentials, *file_hash, *credentials_hash;
     int SHA_n;
-    char user_line[1024], salt[128], crypt_prefix[256];
+    char user_line[1024], crypt_prefix[256], salt[128];
 
     // Iterate over the credentials
     while (credentials != NULL) {
@@ -125,17 +133,39 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
     return 0;
 }
 
+int random_n() {
+    if (rand() % 2 == 0) return 5;
+    return 6;
+}
+
+#define SALT_LENGTH 8
+char *random_salt() {
+    const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const int charset_size = strlen(charset);
+    char *salt = calloc(128, sizeof(char));
+
+    for (int i = 0; i < SALT_LENGTH; i++) {
+        // Generate a random index and assign corresponding character to the string
+        salt[i] = charset[rand() % charset_size];
+    }
+    salt[SALT_LENGTH] = '\0'; // Ensure null-termination
+
+    return salt;
+}
+
 char *change_userfile_line(char *line, char *new_password) {
     int SHA_n;
-    char salt[128];
-    char* line_copy = strdup(line);
+    char *salt;
+    char crypt_prefix[256];
+    char *line_copy = strdup(line);
 
     char *username = strtok_r(line_copy, ":", &line_copy);
     char *hash = strtok_r(NULL, ":", &line_copy);
 
-    // create the new hash
-    parse_hash(hash, &SHA_n, salt);
-    char crypt_prefix[256];
+    // create a new random prefix
+    srand(time(NULL)); // Seed the random number generator
+    SHA_n = random_n();
+    salt = random_salt();
     snprintf(crypt_prefix, 256, "$%d$%s$", SHA_n, salt);
     char *new_hash = crypt(new_password, crypt_prefix);
 
@@ -143,6 +173,7 @@ char *change_userfile_line(char *line, char *new_password) {
     char *new_line = calloc(1024, sizeof(char));
     snprintf(new_line, 1024, "%s:%s\n", username, new_hash);
 
+    free(salt);
     return new_line;
 }
 

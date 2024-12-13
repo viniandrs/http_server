@@ -116,7 +116,9 @@ ValueNode* append_value(ValueNode *value_list, const char *value) {
     return value_list;
 }
 
-void *free_value_list(ValueNode *value_list) {
+void free_value_list(ValueNode *value_list) {
+    if(!value_list) return;
+    
     ValueNode *current_node = value_list;
     ValueNode *next_node = NULL;
     while (current_node->next != NULL) {
@@ -129,7 +131,9 @@ void *free_value_list(ValueNode *value_list) {
     free(current_node);
 }
 
-void *free_field_list(FieldNode *field_list) {
+void free_field_list(FieldNode *field_list) {
+    if(!field_list) return;
+
     FieldNode *current_node = field_list;
     FieldNode *next_node = NULL;
     while (current_node->next != NULL) {

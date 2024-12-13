@@ -27,7 +27,7 @@ char *get_header(char *resource, FieldNode *field_list, int *status) {
     char *resource_abs_path = get_resource_abs_path(resource);
     stat(resource_abs_path, &st);
     if (*status == 200 && S_ISDIR(st.st_mode)) {
-        if (dir_has_file(resource_abs_path, "index.html")) {
+        if (fetch_for_file_in_dir(resource_abs_path, "index.html")) {
             strcat(resource_abs_path, "/index.html");
             stat(resource_abs_path, &st);
         } else {
@@ -130,7 +130,7 @@ int send_file(char *resource, int fd) { // TODO: open file before the conditiona
 
     // if the resource is a directory, fetch first for index.html
     if (S_ISDIR(st.st_mode)) {
-        if (dir_has_file(resource_abs_path, "index.html")) {
+        if (fetch_for_file_in_dir(resource_abs_path, "index.html") == 200) {
             strcat(resource_abs_path, "/index.html");
             stat(resource_abs_path, &st);
         } else {

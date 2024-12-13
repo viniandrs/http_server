@@ -1,0 +1,46 @@
+[drwxrwxrwx vini    ]  webspace_para_testes
+├── [-rwxrwxrwx vini    ]  a.txt
+├── [drw-rw-rw- vini    ]  dir
+├── [drwxrwxrwx vini    ]  dir1
+│   ├── [drwxrwxrwx vini    ]  dir11
+│   │   ├── [drwxrwxrwx vini    ]  dir111
+│   │   │   ├── [-rwxrwxrwx vini    ]  form.html
+│   │   │   └── [-rwxrwxrwx vini    ]  index.html
+│   │   ├── [-rwxrwxrwx vini    ]  form.html
+│   │   └── [-rwxrwxrwx vini    ]  index.html
+│   └── [-rwxrwxrwx vini    ]  index.html
+├── [drwxrwxrwx vini    ]  dir2
+│   └── [-rwxrwxrwx vini    ]  welcome.html
+├── [drwxrwxrwx vini    ]  dir3
+│   ├── [--wx-wx-wx vini    ]  index.html
+│   └── [-rwxrwxrwx vini    ]  welcome.html
+├── [drwxrwxrwx vini    ]  dir4
+│   ├── [drwxrwxrwx vini    ]  dir41
+│   │   ├── [drwxrwxrwx vini    ]  dir411
+│   │   │   └── [-rwxrwxrwx vini    ]  index.html
+│   │   ├── [-rwxrwxrwx vini    ]  form.html
+│   │   └── [-rwxrwxrwx vini    ]  index.html
+│   ├── [--wx-wx-wx vini    ]  index.html
+│   └── [--wx-wx-wx vini    ]  welcome.html
+├── [drwxrwxrwx vini    ]  dir5
+│   └── [-rwxrwxrwx vini    ]  texto_para_testes.txt
+├── [-rwxrwxrwx vini    ]  feec.gif
+├── [-rwxrwxrwx vini    ]  index.html
+├── [-rwxrwxrwx vini    ]  lab.zip
+├── [drwxrwxrwx vini    ]  status_pages
+│   ├── [-rwxrwxrwx vini    ]  forbidden.html
+│   ├── [-rwxrwxrwx vini    ]  internal_server_error.html
+│   ├── [-rwxrwxrwx vini    ]  not_found.html
+│   ├── [-rwxrwxrwx vini    ]  not_implemented.html
+│   ├── [-rwxrwxrwx vini    ]  password_not_updated.html
+│   └── [-rwxrwxrwx vini    ]  password_updated.html
+├── [-rwxrwxrwx vini    ]  teste.odt
+├── [-rwxrwxrwx vini    ]  teste.pdf
+├── [--wx-wx-wx vini    ]  teste.txt
+├── [-rwxrwxrwx vini    ]  unicamp.gif
+├── [-rwxrwxrwx vini    ]  unicamp.jpg
+├── [-rwxrwxrwx vini    ]  unicamp.png
+├── [-rwxrwxrwx vini    ]  unicamp.tif
+└── [-rwxrwxrwx vini    ]  welcome.html
+
+12 directories, 32 files
