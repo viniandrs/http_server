@@ -118,7 +118,6 @@ int fetch_for_file_in_dir(char *dir_abs_path, char *filename) {
             strcat(path, entry->d_name);
             
             status = fetch(path);
-            printf("Status for %s: %d \n", path, status);
 
             closedir(dir);
             return status;
