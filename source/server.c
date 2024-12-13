@@ -28,7 +28,7 @@ extern void yylex_destroy(void);
 // handle the http request
 void process_request(char* request, char *request_body,  int client_socket_fd) {
     // printing request details on the screen
-    printf("\nReceived request:\n%s\nwith request body:\n%s\n\n", request, request_body);
+    // printf("\nReceived request:\n%s\nwith request body:\n%s\n\n", request, request_body);
     FieldNode *field_list;
     char *method, *resource;
 
@@ -54,7 +54,7 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
     char *header;
     header = get_header(resource, field_list, &status);
     
-    printf("\n%s\n", header);
+    // printf("\n%s\n", header);
     if (write_buffer(header, strlen(header), client_socket_fd) != 0) {
         printf("Error while writing header in socket: %s\n", strerror(errno));
         close(client_socket_fd);
