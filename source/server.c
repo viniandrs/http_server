@@ -20,6 +20,7 @@
 #define MAX_CHILDREN 10
 extern int max_threads;
 int current_thread = 0;
+pthread_mutex_t lock; 
 
 extern void yy_scan_string(const char *s);
 extern void yylex_destroy(void);
@@ -129,6 +130,7 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
     free_field_list(field_list);
 }
 
+#define REQUEST_LEN 1024
 int open_socket(int port, struct sockaddr_in *addr) {
     int socket_fd, client_socket;
 
@@ -161,10 +163,8 @@ void* handle_request_thread(void* arg) {
     int client_socket = *((int*)arg);
     free(arg); // Free the dynamically allocated memory for client_socket
 
-    size_t buffer_size = 1024;
-    size_t request_len = 1024;
-    char buffer[buffer_size];
-    char *request;
+    char *crlf; // Pointer to the double CRLF in the request, allowing to split the request into header and body;
+    char request[REQUEST_LEN]; // Buffer to store the request
     int timeout = 8000; // timeout in milliseconds
     struct pollfd fds[1];
 
@@ -172,67 +172,73 @@ void* handle_request_thread(void* arg) {
     fds[0].fd = client_socket;
     fds[0].events = POLLIN;
 
-    // Reading the request until it is ended with a double CRLF, double new_line or a timeout
-    int n, n_bytes, total_bytes_read = 0;
-    request = (char *)calloc(request_len, sizeof(char));
+    // Reading the request
+    int n, n_bytes;
     while (1) {
-        if ((n = poll(fds, 1, timeout)) == -1) {
+        if ((n = poll(fds, 1, timeout)) == -1) { // Poll error
             printf("Poll error: %s\n", strerror(errno));
             close(client_socket);
+
+            pthread_mutex_lock(&lock);
             current_thread--;
+            pthread_mutex_unlock(&lock);
             pthread_exit(NULL);
 
-        } else if (n == 0) {
+        } else if (n == 0) { // Timeout reached
             printf("Timeout reached\n");
             close(client_socket);
+            
+            pthread_mutex_lock(&lock);
             current_thread--;
+            pthread_mutex_unlock(&lock);
             pthread_exit(NULL);
 
-        } else if (fds[0].revents & POLLIN) {
-            // Reading up to n_bytes from the socket and appending it to the request buffer
-            n_bytes = recv(client_socket, buffer, buffer_size, 0);
+        } else if (fds[0].revents & POLLIN) { // Read the request
+            n_bytes = recv(client_socket, request, REQUEST_LEN, 0);
             if (n_bytes < 0) {
                 printf("Receive error: %s\n", strerror(errno));
                 close(client_socket);
+                
+                pthread_mutex_lock(&lock);
                 current_thread--;
+                pthread_mutex_unlock(&lock);
                 pthread_exit(NULL);
             } else if (n_bytes == 0) {
                 printf("Connection closed by client\n");
                 close(client_socket);
+                
+                pthread_mutex_lock(&lock);
                 current_thread--;
+                pthread_mutex_unlock(&lock);
                 pthread_exit(NULL);
             }
 
-            buffer[n_bytes] = '\0';
-            total_bytes_read += n_bytes;
-            if (total_bytes_read + 1 > request_len) {
-                request_len *= 2;
-                request = (char *)realloc(request, request_len);
-            }
+            request[REQUEST_LEN] = '\0'; // Ensure the request is null-terminated
 
-            strcat(request, buffer);
-
-            // if the request is ended with a double CRLF, process it
-            char *crlf;
+            // process the request only if is ended with a double CRLF
             if ((crlf = strstr(request, "\r\n\r\n")) != NULL) {
                 crlf[2] = '\0'; // End the request string
                 char *request_body = crlf + 4;
                 process_request(request, request_body, client_socket);
                 close(client_socket);
-                free(request);
+                
+                pthread_mutex_lock(&lock);
                 current_thread--;
-                pthread_exit(NULL); // End the thread after processing the request
+                pthread_mutex_unlock(&lock);
+                pthread_exit(NULL);
             }
             
         } else {
             printf("Undefined poll error: %s\n", strerror(errno));
             close(client_socket);
-            free(request);
+            
+            pthread_mutex_lock(&lock);
             current_thread--;
+            pthread_mutex_unlock(&lock);
             pthread_exit(NULL);
         }
     }
-}
+} 
 
 void start_server(int port, const int max_threads) {
     int socket_fd, client_socket_fd;
@@ -248,6 +254,12 @@ void start_server(int port, const int max_threads) {
     // Creating socket
     socket_fd = open_socket(port, &serv_addr);
 
+    // Initialize the mutex
+    if (pthread_mutex_init(&lock, NULL) != 0) { 
+        printf("\n mutex init has failed\n"); 
+        return; 
+    } 
+
     while (1) {
         // Accept an incoming connection
         if ((client_socket_fd = accept(socket_fd, (struct sockaddr *)&serv_addr, (socklen_t *)&address_len)) < 0) {
@@ -257,7 +269,6 @@ void start_server(int port, const int max_threads) {
         setsockopt(client_socket_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 
         // Allocate memory for the client socket argument and pass it to the thread
-        current_thread++;
         int* client_socket_ptr = (int*)malloc(sizeof(int));
         if (client_socket_ptr == NULL) {
             printf("Error allocating memory for client_socket\n");
@@ -267,16 +278,15 @@ void start_server(int port, const int max_threads) {
         *client_socket_ptr = client_socket_fd;
 
         // Create a thread to handle the request
+        pthread_mutex_lock(&lock);
         if (pthread_create(&thread_id[current_thread], NULL, handle_request_thread, (void*)client_socket_ptr) != 0) {
             printf("Thread creation failed: %s\n", strerror(errno));
             close(client_socket_fd);
             free(client_socket_ptr);
-            current_thread--;
+            pthread_mutex_unlock(&lock);
             continue;
         }
-
-        // close(client_socket_fd);
-        // close(socket_fd);
-        // exit(1);
+        current_thread++;
+        pthread_mutex_unlock(&lock);
     }
 }

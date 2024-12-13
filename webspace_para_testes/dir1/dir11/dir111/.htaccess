@@ -1,0 +1,11 @@
+# Enable Basic Authentication
+AuthType Basic
+
+# Specify the realm (this is the prompt shown to the user)
+AuthName "dir111"
+
+# Specify the path to the password file containing the user credentials
+AuthUserFile ../../../../.htpasswd11
+
+# Allow specific users to access the resource
+Require valid-user

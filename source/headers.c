@@ -57,8 +57,8 @@ ValueNode *get_content_type(char *resource_abs_path) {
         { "tiff", "image/tiff" },
         { "pdf", "application/pdf" },
         { "zip", "application/zip" },
-        { "html", "text/html" },
-        { "txt", "text/plain" },
+        { "html", "text/html;" },
+        { "txt", "text/plain; charset=utf-8" },
         { "odt", "application/vnd.oasis.opendocument.text" },
         { NULL, NULL }  // Sentinel value
     };
