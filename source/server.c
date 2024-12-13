@@ -52,17 +52,15 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
     // getting header
     int status;
     char *header;
-    printf("Getting header...\n");
     header = get_header(resource, field_list, &status);
     
-    printf("Header: \n%s\n", header);
+    printf("\n%s\n", header);
     if (write_buffer(header, strlen(header), client_socket_fd) != 0) {
         printf("Error while writing header in socket: %s\n", strerror(errno));
         close(client_socket_fd);
         return;
     }
 
-    printf("Status: %d; Method: %s; Resource: %s\n", status, method, resource);
     // sending the resource according to the HTTP method
     if ((status != 200) && (status != 201)) {
         send_error_file(status, client_socket_fd); // if the status is not 200 or 201, send the error body
@@ -102,7 +100,6 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
                 return;
             }
         } else if (strcmp(method, "POST") == 0) {
-            printf("Parsing request body...\n");
             char **values = parse_request_body(request_body);
 
             status = 201;

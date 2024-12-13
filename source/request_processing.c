@@ -19,7 +19,6 @@ char *get_header(char *resource, FieldNode *field_list, int *status) {
     if (auth) credentials = auth->values;
     else credentials = NULL;
 
-    printf("Fetching the resource recursively...\n");
     *status = fetchr(resource, credentials);
     printf("\n");
     
@@ -91,7 +90,6 @@ int send_error_file(int status, int fd) {
     }
     char *error_message_abs_path = get_resource_abs_path(error_message_path);
     if(stat(error_message_abs_path, &st) != 0) {
-        printf("Stat error for file %s: %s\n", error_message_abs_path, strerror(errno));
         free(error_message_abs_path);
         return 500;
     }
@@ -99,7 +97,6 @@ int send_error_file(int status, int fd) {
     
     FILE *error_file = fopen(error_message_abs_path, "r");
     if (error_file == NULL) {
-        printf("Error while opening error file: %s\n", strerror(errno));
         free(error_message_abs_path);
         return errno;
     }
@@ -109,7 +106,6 @@ int send_error_file(int status, int fd) {
     fclose(error_file);
 
     if(write_buffer(buffer, n_bytes, fd)) {
-        printf("Error while writing error file: %s\n", strerror(errno));
         free(error_message_abs_path);
         return errno;
     }
@@ -138,7 +134,6 @@ int send_file(char *resource, int fd) { // TODO: open file before the conditiona
             stat(resource_abs_path, &st);
         }
     }
-    printf("Sending file %s\n", resource_abs_path);
 
     FILE *resource_file = fopen(resource_abs_path, "r");
     if (!resource_file) {
@@ -150,7 +145,6 @@ int send_file(char *resource, int fd) { // TODO: open file before the conditiona
 
     // if the content length is smaller than the buffer size, read the whole file
     if (st.st_size < BUFFER_SIZE) {
-        printf("Content length is smaller than buffer size\n");
         bytes_read = fread(buffer, 1, st.st_size, resource_file);
 
         if(write_buffer(buffer, bytes_read, fd)) {
@@ -160,7 +154,6 @@ int send_file(char *resource, int fd) { // TODO: open file before the conditiona
         }
     } else {
         // if the content length is bigger than the buffer size, read the file in chunks
-        printf("Content length is bigger than buffer size. Sending the file in chunks...\n");
         while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, resource_file)) > 0) {
             if(write_buffer(buffer, bytes_read, fd)) {
                 printf("Error while writing resource file: %s\n", strerror(errno));

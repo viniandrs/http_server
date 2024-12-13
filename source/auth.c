@@ -64,7 +64,6 @@ int parse_hash(char *hash, int *n, char *salt) {
     char *copy = strdup(hash);
     char *token = strtok_r(copy, "$", &copy);
     if(!token) {
-        printf("Error while parsing hash\n");
         return 0;
     }
 
@@ -74,7 +73,6 @@ int parse_hash(char *hash, int *n, char *salt) {
     // Get the salt
     token = strtok_r(NULL, "$", &copy);
     if(!token) {
-        printf("Error while parsing hash\n");
         return 0;
     }
     strncpy(salt, token, 128); // Limit salt length to 128
@@ -86,7 +84,6 @@ int parse_hash(char *hash, int *n, char *salt) {
 int credentials_match_userfile(char *user_file, ValueNode *credentials) {
     FILE *user_file_ptr = fopen(user_file, "r");
     if (user_file_ptr == NULL) {
-        perror("Error while opening user file");
         return 0;
     }
 
@@ -98,7 +95,6 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
     while (credentials != NULL) {
         encoded_credentials = strdup(credentials->value + 7);
         decoded_credentials = base64_decode(encoded_credentials);
-        printf("Decoded credentials: %s\n", decoded_credentials);
         password = strdup(strchr(decoded_credentials, ':') + 1);
         username = strtok_r(decoded_credentials, ":", &decoded_credentials);
         
@@ -110,7 +106,6 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
             if (strncmp(user_line, username, strlen(username)) == 0) {
                 file_hash = strchr(user_line, ':') + 1;
                 if (!parse_hash(file_hash, &SHA_n, salt)) {
-                    printf("Error while parsing hash\n");
                     fclose(user_file_ptr);
                     return 0;
                 }
@@ -118,7 +113,6 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
                 // Compare the hashes
                 snprintf(crypt_prefix, 256, "$%d$%s$", SHA_n, salt);
                 credentials_hash = crypt(password, crypt_prefix);
-                printf("Comparing hashes: %d\n", strncmp(file_hash, credentials_hash, strlen(file_hash)));
                 if (strncmp(file_hash, credentials_hash, strlen(file_hash)) == 0) {
                     fclose(user_file_ptr);
                     return 1; // Credentials match
@@ -128,7 +122,6 @@ int credentials_match_userfile(char *user_file, ValueNode *credentials) {
         credentials = credentials->next;
         decoded_credentials = "";
     }
-    printf("Credentials provided don't match\n");
     fclose(user_file_ptr);
     return 0;
 }
@@ -185,7 +178,6 @@ int update_user_credentials(char *user_file_abs_path, char *username, char *pass
 
     // Counting lines in file
     if (!(user_file_ptr = fopen(user_file_abs_path, "r"))) {
-        printf("Error while opening user file: %s\n", strerror(errno));
         return 0;
     }
     while (fgets(line, sizeof(line), user_file_ptr)) {
@@ -197,7 +189,6 @@ int update_user_credentials(char *user_file_abs_path, char *username, char *pass
     lines = (char **)calloc(line_count, sizeof(char *));
     line_count = 0;
     while (fgets(line, sizeof(line), user_file_ptr)) {
-        printf("Line: %s\n", line);
         lines[line_count] = strdup(line);
         line_count++;
     }
@@ -223,7 +214,6 @@ int update_user_credentials(char *user_file_abs_path, char *username, char *pass
         fputs(lines[i], user_file_ptr);
         free(lines[i]);
     }
-    printf("User password updated\n");
 
     free(lines);
     fclose(user_file_ptr);
@@ -379,7 +369,6 @@ int update_passwords(char *resource, char **values) {
         printf("User file not found at %s\n", userfile_abs_path);
         return 0;
     }
-    printf("Updating userfile located in %s\n", userfile_abs_path);
 
     if (!update_user_credentials(userfile_abs_path, username, new_password)) {
         return 0;

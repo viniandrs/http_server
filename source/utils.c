@@ -19,7 +19,6 @@ extern char *log_file, *webspace_path;
 
 int fetchr(char *resource, ValueNode *credentials) {
     if (!is_in_webspace(resource)) {
-        printf("checking if resource %s is in webspace\n", resource);
         return 403;  // Forbidden
     }
 
@@ -36,7 +35,6 @@ int fetchr(char *resource, ValueNode *credentials) {
 
     // The first dir to fetch is the webspace itself
     status = fetch(partial_path);
-    printf("Status for %s: %d\n", partial_path, status);
     if (status != 200) {
         free(p);
         return status;
@@ -51,22 +49,18 @@ int fetchr(char *resource, ValueNode *credentials) {
 
         // checking if the resource is protected by .htaccess file
         if (is_dir_protected(partial_path)) {
-            printf("Directory is protected by %s%s\n", partial_path, "/.htaccess");
             strcat(htaccess_path, partial_path);
             strcat(htaccess_path, "/.htaccess");
             
             if (!check_credentials(htaccess_path, credentials)) {
-                printf("Access denied. Returing status 401\n");
                 free(p);
                 return 401;  // Forbidden
             }
-            printf("Access granted\n");
             htaccess_path[0] = '\0';
         }
 
         // Fetch the resource
         status = fetch(partial_path);
-        printf("Status for %s: %d\n", partial_path, status);
 
         // Move to the next token (directory or file)
         token = strtok_r(NULL, "/", &resolved_resource_path);
@@ -80,24 +74,19 @@ int fetchr(char *resource, ValueNode *credentials) {
     struct stat st;
     stat(partial_path, &st);
     if (S_ISDIR(st.st_mode)) {
-        printf("fetching for index.html or welcome.html in dir %s\n", partial_path);
 
         // checking if the resource is protected by .htaccess file
         if (is_dir_protected(partial_path)) {
-            printf("Directory is protected by %s%s\n", partial_path, "/.htaccess");
             strcat(htaccess_path, partial_path);
             strcat(htaccess_path, "/.htaccess");
 
             if (!check_credentials(htaccess_path, credentials)) {
-                printf("Access denied for %s\n", htaccess_path);
                 return 401;  // Forbidden
             }
-            printf("Access granted for %s\n", htaccess_path);
         }
         
         // look for index.html or welcome.html
         char *dir_path = strdup(partial_path);
-        printf("Checking for index.html or welcome.html in %s\n", dir_path);    
         if ((status = fetch_for_file_in_dir(dir_path, "index.html")) == 200) {
             free(dir_path);
             return 200;
@@ -116,6 +105,10 @@ int fetch_for_file_in_dir(char *dir_abs_path, char *filename) {
     int status;
     char path[1024]="";
     DIR *dir = opendir(dir_abs_path);
+    if (!dir) {
+        printf("Error while opening dir %s: %s\n",dir_abs_path, strerror(errno));
+        return 500;  // Internal server error
+    }
     struct dirent *entry;
 
     while ((entry = readdir(dir)) != NULL) {
@@ -192,7 +185,6 @@ int fetch(const char *abs_path) {
 }
 
 int write_buffer(char *buffer, int n_bytes, int fd) {
-    printf("Writing buffer to socket\n");
     size_t bytes_written = 0;
 
     // Send the response
@@ -201,7 +193,6 @@ int write_buffer(char *buffer, int n_bytes, int fd) {
         close(fd);
         return errno;
     }
-    printf("Sent buffer with size of %ld bytes\n", bytes_written);
     return 0;
 }
 
