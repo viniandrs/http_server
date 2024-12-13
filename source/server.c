@@ -274,7 +274,7 @@ void start_server(int port, const int max_threads) {
     while (1) {
         // Accept an incoming connection
         if ((client_socket_fd = accept(socket_fd, (struct sockaddr *)&serv_addr, (socklen_t *)&address_len)) < 0) {
-            printf("Accept error: %s\n", strerror(errno));
+            // printf("Accept error: %s\n", strerror(errno));
             continue; // keep trying to accept a connection instead of exiting
         }
         setsockopt(client_socket_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
