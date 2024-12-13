@@ -20,7 +20,6 @@ char *get_header(char *resource, FieldNode *field_list, int *status) {
     else credentials = NULL;
 
     *status = fetchr(resource, credentials);
-    printf("\n");
     
     // if the resource is a directory, check for index.html or welcome.html
     char *resource_abs_path = get_resource_abs_path(resource);

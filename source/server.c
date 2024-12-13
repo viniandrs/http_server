@@ -105,11 +105,11 @@ void process_request(char* request, char *request_body,  int client_socket_fd) {
             status = 201;
             if(!update_passwords(resource, values)) {
                 // password not changed
-                printf("Error while changing password\n");
+                // printf("Error while changing password\n");
                 send_file("/status_pages/password_not_updated.html", client_socket_fd);
                 
             } else {
-                printf("Password changed successfully!\n");
+                // printf("Password changed successfully!\n");
                 send_file("/status_pages/password_updated.html", client_socket_fd);
             }
 
